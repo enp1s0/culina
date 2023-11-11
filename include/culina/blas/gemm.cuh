@@ -4,22 +4,37 @@
 #include "types.cuh"
 
 namespace culina::blas {
-template <class Ta, class Tb, class Tc, class Ts, class Mode = culina::default_mode>
+template <class Ta_, class Tb_, class Tc_, class Ts_, class ComputeT_, class Mode_>
+struct gemm_policy {
+  using Ta = Ta_;
+  using Tb = Tb_;
+  using Tc = Tc_;
+  using ComputeT = ComputeT_;
+  using Mode = Mode_;
+};
+
+template <class T, class Mode = culina::default_mode>
+using default_gemm_polict = gemm_policy<T, T, T, T, T, Mode>;
+
+template <class GemmPolicy>
 struct gemm {
   inline culina::status_t operator()(
     culina::handle_base* const handle, 
     const culina::blas::op_t op_a,
     const culina::blas::op_t op_b,
-    const Ts alpha,
-    const Ta* a_ptr, const std::size_t lda,
-    const Tb* b_ptr, const std::size_t ldb,
-    const Ts beta,
-    Tc* const c_ptr, const std::size_t ldc
+    const std::size_t m,
+    const std::size_t n,
+    const std::size_t k,
+    const typename GemmPolicy::Ts alpha,
+    const typename GemmPolicy::Ta* a_ptr, const std::size_t lda,
+    const typename GemmPolicy::Tb* b_ptr, const std::size_t ldb,
+    const typename GemmPolicy::Ts beta,
+    typename GemmPolicy::Tc* const c_ptr, const std::size_t ldc
     );
 };
 
 template <class T, class Mode>
-struct gemm<T, T, T, T, Mode> {
+struct gemm<gemm_policy<T, T, T, T, T, Mode>> {
   inline culina::status_t operator()(
     culina::handle_base* const handle, 
     const culina::blas::op_t op_a,
