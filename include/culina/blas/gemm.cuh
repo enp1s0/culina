@@ -14,7 +14,7 @@ struct gemm_policy {
 };
 
 template <class T, class Mode = culina::default_mode>
-using default_gemm_polict = gemm_policy<T, T, T, T, T, Mode>;
+using default_gemm_policy = gemm_policy<T, T, T, T, T, Mode>;
 
 template <class GemmPolicy>
 struct gemm {
