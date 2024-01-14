@@ -61,7 +61,7 @@ void eval(
   auto* culina_handle = new culina_handle_t;
   culina_handle->create();
 
-  using gemm_policy = culina::blas::default_gemm_polict<T, Mode>;
+  using gemm_policy = culina::blas::default_gemm_policy<T, Mode>;
   culina::blas::gemm<gemm_policy>{}(
       culina_handle,
       op_A,

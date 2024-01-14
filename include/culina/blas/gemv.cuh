@@ -68,7 +68,7 @@ struct gemv_policy {
 };
 
 template <class T, class Mode = culina::default_mode>
-using default_gemv_polict = gemv_policy<T, T, T, T, T, Mode>;
+using default_gemv_policy = gemv_policy<T, T, T, T, T, Mode>;
 
 template <class GemvPolicy>
 struct gemv {
@@ -107,7 +107,7 @@ struct gemv {
 };
 
 template <>
-struct gemv<default_gemv_polict<float, culina::default_mode>> {
+struct gemv<default_gemv_policy<float, culina::default_mode>> {
   inline culina::status_t operator()(
     culina::handle_base* const handle, 
     const culina::blas::op_t op_a,
@@ -134,7 +134,7 @@ struct gemv<default_gemv_polict<float, culina::default_mode>> {
 };
 
 template <>
-struct gemv<default_gemv_polict<double, culina::default_mode>> {
+struct gemv<default_gemv_policy<double, culina::default_mode>> {
   inline culina::status_t operator()(
     culina::handle_base* const handle, 
     const culina::blas::op_t op_a,

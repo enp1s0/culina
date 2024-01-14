@@ -59,7 +59,7 @@ void eval(
   auto* culina_handle = new culina_handle_t;
   culina_handle->create();
 
-  using gemv_policy = culina::blas::default_gemv_polict<T, Mode>;
+  using gemv_policy = culina::blas::default_gemv_policy<T, Mode>;
   culina::blas::gemv<gemv_policy>{}(
       culina_handle,
       op_A,
