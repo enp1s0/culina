@@ -1,10 +1,10 @@
+#include "../utils.cuh"
+#include <culina/culina.cuh>
 #include <random>
 #include <typeinfo>
-#include <culina/culina.cuh>
-#include "../utils.cuh"
 
 class culina_handle_t : public culina::handle_base {
- public:
+public:
   virtual ~culina_handle_t() {}
 
   inline culina::status_t create() {
@@ -18,10 +18,7 @@ class culina_handle_t : public culina::handle_base {
   }
 };
 
-template <class T, class Mode>
-void eval(
-    const std::size_t n
-    ) {
+template <class T, class Mode> void eval(const std::size_t n) {
   const auto incx = 1;
   const auto incy = 2;
 
@@ -30,39 +27,37 @@ void eval(
 
   std::uniform_real_distribution<double> dist(-1, 1);
   std::mt19937 mt(0);
-  for (std::size_t i = 0; i < n; i++) {vec_x.get()[i * incx] = static_cast<T>(dist(mt));}
-  for (std::size_t i = 0; i < n; i++) {vec_y.get()[i * incy] = static_cast<T>(dist(mt));}
-
-  double c_ref = 0;
-#pragma omp parallel for reduction(+: c_ref)
   for (std::size_t i = 0; i < n; i++) {
-    c_ref += static_cast<double>(vec_x.get()[i * incx]) * static_cast<double>(vec_y.get()[i * incy]);
+    vec_x.get()[i * incx] = static_cast<T>(dist(mt));
+  }
+  for (std::size_t i = 0; i < n; i++) {
+    vec_y.get()[i * incy] = static_cast<T>(dist(mt));
   }
 
-  auto* culina_handle = new culina_handle_t;
+  double c_ref = 0;
+#pragma omp parallel for reduction(+ : c_ref)
+  for (std::size_t i = 0; i < n; i++) {
+    c_ref += static_cast<double>(vec_x.get()[i * incx]) *
+             static_cast<double>(vec_y.get()[i * incy]);
+  }
+
+  auto *culina_handle = new culina_handle_t;
   culina_handle->create();
 
   T c;
 
   using dot_policy = culina::blas::default_dot_policy<T, Mode>;
-  culina::blas::dot<dot_policy>{}(
-      culina_handle,
-      n,
-      vec_x.get(), incx,
-      vec_y.get(), incy,
-      &c
-      );
+  culina::blas::dot<dot_policy>{}(culina_handle, n, vec_x.get(), incx,
+                                  vec_y.get(), incy, &c);
 
   CULINA_CHECK_ERROR(cudaStreamSynchronize(culina_handle->stream()));
 
-  double error = std::abs((static_cast<double>(c) - c_ref) / static_cast<double>(c_ref));
-  const auto error_threshold = culina_test::get_error_threshold<T>() * std::sqrt(static_cast<double>(n));
-  std::printf("%s,%lu,%e,%s\n",
-              typeid(T).name(),
-              n,
-              error,
-              (error < error_threshold ? "OK" : "NG")
-              );
+  double error =
+      std::abs((static_cast<double>(c) - c_ref) / static_cast<double>(c_ref));
+  const auto error_threshold =
+      culina_test::get_error_threshold<T>() * std::sqrt(static_cast<double>(n));
+  std::printf("%s,%lu,%e,%s\n", typeid(T).name(), n, error,
+              (error < error_threshold ? "OK" : "NG"));
 
   culina_handle->destroy();
   delete culina_handle;
@@ -71,8 +66,8 @@ void eval(
 int main() {
   std::printf("dtype,m,relative_error,check\n");
   for (std::size_t N = 32; N <= 8192; N <<= 1) {
-    eval<half  , culina::default_mode>(N);
-    eval<float , culina::default_mode>(N);
+    eval<half, culina::default_mode>(N);
+    eval<float, culina::default_mode>(N);
     eval<double, culina::default_mode>(N);
   }
 }
