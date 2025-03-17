@@ -1,24 +1,20 @@
 #pragma once
-#include <cublas_v2.h>
 #include "cuda.cuh"
+#include <cublas_v2.h>
 
 namespace culina {
-enum class status_t {
-  success = 0
-};
+enum class status_t { success = 0 };
 
 class handle_base {
- protected:
+protected:
   cublasHandle_t cublas_handle_;
   cudaStream_t cuda_stream_ = 0;
 
- public:
+public:
   handle_base() {}
   ~handle_base() {}
 
-  inline cublasHandle_t cublas_handle() const {
-    return cublas_handle_;
-  }
+  inline cublasHandle_t cublas_handle() const { return cublas_handle_; }
 
   virtual inline culina::status_t create() {
     CULINA_CHECK_ERROR(cublasCreate(&cublas_handle_));
@@ -37,8 +33,6 @@ class handle_base {
     return culina::status_t::success;
   }
 
-  inline cudaStream_t stream() const {
-    return cuda_stream_;
-  }
+  inline cudaStream_t stream() const { return cuda_stream_; }
 };
 } // namespace culina
