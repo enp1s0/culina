@@ -1,5 +1,6 @@
 #pragma once
 #include <culina/cuda.cuh>
+#include <culina/types.cuh>
 #include <iostream>
 #include <memory>
 
@@ -38,4 +39,15 @@ template <class T> constexpr double get_error_threshold();
 template <> constexpr double get_error_threshold<double>() { return 1e-15; }
 template <> constexpr double get_error_threshold<float>() { return 1e-7; }
 template <> constexpr double get_error_threshold<half>() { return 1e-3; }
+
+template <class T> std::string get_str();
+template <> std::string get_str<culina::default_mode>() {
+  return "default_mode";
+}
+template <> std::string get_str<culina::generic_kernel_mode>() {
+  return "generic_kernel_mode";
+}
+template <> std::string get_str<double>() { return "double"; }
+template <> std::string get_str<float>() { return "float"; }
+template <> std::string get_str<half>() { return "half"; }
 } // namespace culina_test

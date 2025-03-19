@@ -31,13 +31,13 @@ class tensor_op_bf16;
 
 namespace detail {
 template <class T, class Mode> struct cuda_type_ts;
-template <> struct cuda_type_ts<double, culina::default_mode> {
+template <class Mode> struct cuda_type_ts<double, Mode> {
   constexpr static cublasComputeType_t value = CUBLAS_COMPUTE_64F;
 };
-template <> struct cuda_type_ts<float, culina::default_mode> {
+template <class Mode> struct cuda_type_ts<float, Mode> {
   constexpr static cublasComputeType_t value = CUBLAS_COMPUTE_32F;
 };
-template <> struct cuda_type_ts<half, culina::default_mode> {
+template <class Mode> struct cuda_type_ts<half, Mode> {
   constexpr static cublasComputeType_t value = CUBLAS_COMPUTE_16F;
 };
 template <> struct cuda_type_ts<float, culina::blas::tensor_op_tf32> {
