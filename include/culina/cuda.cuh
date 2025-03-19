@@ -1,5 +1,6 @@
 #pragma once
 #include <cassert>
+#include <cublas_v2.h>
 #include <iostream>
 #include <sstream>
 

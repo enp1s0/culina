@@ -2,6 +2,7 @@
 
 namespace culina {
 class default_mode;
+class generic_kernel_mode;
 
 namespace detail {
 template <class T> struct cuda_data_ts;

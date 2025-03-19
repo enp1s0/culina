@@ -1,15 +1,16 @@
 NVCC=nvcc
-NVCCFLAGS=-std=c++17 -Xcompiler="-Wall -fopenmp"
+NVCCFLAGS=-std=c++20 -Xcompiler="-Wall -fopenmp"
+NVCCFLAGS+=-gencode arch=compute_90,code=sm_90
 NVCCFLAGS+=-gencode arch=compute_80,code=sm_80
-NVCCFLAGS+=-gencode arch=compute_75,code=sm_75
-NVCCFLAGS+=-gencode arch=compute_60,code=sm_60
-NVCCFLAGS+=-lcublas -I../../include
+INCDIR=../../include
+NVCCFLAGS+=-lcublas -I$(INCDIR)
+HEADERS=$(shell find $(INCDIR) -name '*.cuh' -o -name '*.hpp' -o -name '*.h')
 
 TARGETS=gemm.test gemv.test dot.test
 
 all: $(TARGETS)
 
-%.test:%.cu
+%.test:%.cu $(HEADERS)
 		$(NVCC) $< -o $@ $(NVCCFLAGS)
 		  
 clean:

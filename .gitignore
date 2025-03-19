@@ -34,6 +34,7 @@
 *.exe
 *.out
 *.app
+*.test
 
 ### CUDA ###
 *.i
@@ -42,6 +43,8 @@
 *.ptx
 *.cubin
 *.fatbin
+*.nsys-rep
+*.sqlite
 
 ### Vim ###
 # Swap
