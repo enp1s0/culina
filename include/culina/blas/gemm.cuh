@@ -1,5 +1,6 @@
 #pragma once
 #include "../handle.cuh"
+#include "../utils.cuh"
 #include "types.cuh"
 #include <concepts>
 #include <type_traits>

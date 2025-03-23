@@ -1,5 +1,6 @@
 #pragma once
 #include <culina/cuda.cuh>
+#include <culina/numeric_format/interval.hpp>
 #include <culina/types.cuh>
 #include <iostream>
 #include <memory>
@@ -35,7 +36,9 @@ inline device_unique_ptr<T> get_device_unique_ptr(const std::size_t count) {
   return device_unique_ptr<T>{ptr};
 }
 
-template <class T> constexpr double get_error_threshold();
+template <class T> constexpr double get_error_threshold() {
+  return get_error_threshold<typename T::data_t>();
+}
 template <> constexpr double get_error_threshold<double>() { return 1e-15; }
 template <> constexpr double get_error_threshold<float>() { return 1e-7; }
 template <> constexpr double get_error_threshold<half>() { return 1e-3; }
@@ -50,4 +53,13 @@ template <> std::string get_str<culina::generic_kernel_mode>() {
 template <> std::string get_str<double>() { return "double"; }
 template <> std::string get_str<float>() { return "float"; }
 template <> std::string get_str<half>() { return "half"; }
+template <> std::string get_str<culina::numeric_format::interval<double>>() {
+  return "interval<double>";
+}
+template <> std::string get_str<culina::numeric_format::interval<float>>() {
+  return "interval<float>";
+}
+template <> std::string get_str<culina::numeric_format::interval<half>>() {
+  return "interval<half>";
+}
 } // namespace culina_test

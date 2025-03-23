@@ -129,6 +129,12 @@ int main() {
       eval<half, culina::generic_kernel_mode>(m, n, k, op_A, op_B);
       eval<float, culina::generic_kernel_mode>(m, n, k, op_A, op_B);
       eval<double, culina::generic_kernel_mode>(m, n, k, op_A, op_B);
+      eval<culina::numeric_format::interval<half>, culina::generic_kernel_mode>(
+          m, n, k, op_A, op_B);
+      eval<culina::numeric_format::interval<float>,
+           culina::generic_kernel_mode>(m, n, k, op_A, op_B);
+      eval<culina::numeric_format::interval<double>,
+           culina::generic_kernel_mode>(m, n, k, op_A, op_B);
     }
   }
 }
