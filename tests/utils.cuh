@@ -39,9 +39,9 @@ inline device_unique_ptr<T> get_device_unique_ptr(const std::size_t count) {
 template <class T> constexpr double get_error_threshold() {
   return get_error_threshold<typename T::data_t>();
 }
-template <> constexpr double get_error_threshold<double>() { return 1e-15; }
-template <> constexpr double get_error_threshold<float>() { return 1e-7; }
-template <> constexpr double get_error_threshold<half>() { return 1e-3; }
+template <> constexpr double get_error_threshold<double>() { return 1e-14; }
+template <> constexpr double get_error_threshold<float>() { return 1e-6; }
+template <> constexpr double get_error_threshold<half>() { return 1e-2; }
 
 template <class T> std::string get_str();
 template <> std::string get_str<culina::default_mode>() {

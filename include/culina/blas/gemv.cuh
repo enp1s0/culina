@@ -5,7 +5,8 @@
 
 namespace {
 // One y element per warp
-template <class Ta, class Tx, class Ty, class Ts, class ComputeT>
+template <class Ta, class Tx, class Ty, class Ts, class ComputeT,
+          std::uint32_t block_size>
 __global__ void generic_gemv_kernel(const culina::blas::op_t op_a,
                                     const std::size_t m, const std::size_t n,
                                     const Ts alpha, const Ta *a_ptr,
@@ -27,17 +28,33 @@ __global__ void generic_gemv_kernel(const culina::blas::op_t op_a,
     for (std::size_t i = lane_id; i < k; i += warp_size) {
       const ComputeT a = a_ptr[i * lda + pi];
       const ComputeT x = x_ptr[i * incx];
-      c += a * x;
+      c = c + a * x;
     }
   } else if (op_a == culina::blas::op_t::T) {
     for (std::size_t i = lane_id; i < k; i += warp_size) {
       const ComputeT a = a_ptr[pi * lda + i];
       const ComputeT x = x_ptr[i * incx];
-      c += a * x;
+      c = c + a * x;
     }
   }
-  for (auto mask = (warp_size >> 1); mask > 0; mask >>= 1) {
-    c += __shfl_xor_sync(~0u, c, mask);
+  if constexpr (std::is_arithmetic_v<ComputeT> ||
+                std::is_same_v<ComputeT, half>) {
+    // If warp shuffle supports ComputeT
+    for (auto mask = (warp_size >> 1); mask > 0; mask >>= 1) {
+      c = c + __shfl_xor_sync(~0u, c, mask);
+    }
+  } else {
+    __shared__ ComputeT smem[block_size];
+    auto local_smem_ptr = smem + (threadIdx.x / warp_size) * warp_size;
+    local_smem_ptr[lane_id] = c;
+
+    __syncwarp();
+    for (auto mask = (warp_size >> 1); mask > 0; mask >>= 1) {
+      local_smem_ptr[lane_id] =
+          local_smem_ptr[lane_id] + local_smem_ptr[(lane_id ^ mask)];
+    }
+
+    c = local_smem_ptr[lane_id];
   }
 
   if (lane_id == 0) {
@@ -88,7 +105,7 @@ template <class GemvPolicy> struct gemv {
     using Ts = typename GemvPolicy::Ts;
     using ComputeT = typename GemvPolicy::ComputeT;
     using Mode = typename GemvPolicy::Mode;
-    generic_gemv_kernel<Ta, Tx, Ty, Ts, ComputeT>
+    generic_gemv_kernel<Ta, Tx, Ty, Ts, ComputeT, block_size>
         <<<grid_size, block_size, 0, handle->stream()>>>(
             op_a, m, n, alpha, a_ptr, lda, x_ptr, incx, beta, y_ptr, incy);
     return culina::status_t::success;

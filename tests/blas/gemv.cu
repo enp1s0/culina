@@ -19,8 +19,8 @@ public:
 };
 
 template <class T, class Mode>
-void eval(const std::size_t m, const std::size_t n,
-          const culina::blas::op_t op_A) {
+int eval(const std::size_t m, const std::size_t n,
+         const culina::blas::op_t op_A) {
   const auto vec_X_len = op_A == culina::blas::op_t::N ? n : m;
   const auto vec_Y_len = op_A == culina::blas::op_t::N ? m : n;
   const auto lda = m;
@@ -85,20 +85,50 @@ void eval(const std::size_t m, const std::size_t n,
   const auto error = std::sqrt(diff_norm2 / base_norm2);
   const auto error_threshold =
       culina_test::get_error_threshold<T>() * std::sqrt(static_cast<double>(n));
-  std::printf("%s,%s,%lu,%lu,%e,%s\n", typeid(T).name(),
-              culina::blas::to_str(op_A).c_str(), m, n, error,
-              (error < error_threshold ? "OK" : "NG"));
+  const auto passed = error < error_threshold;
+  if (!passed) {
+    std::printf("%s,%s,%lu,%lu,%e,%s\n", culina_test::get_str<T>().c_str(),
+                culina::blas::to_str(op_A).c_str(), m, n, error,
+                (passed ? "OK" : "NG"));
+  }
 
   culina_handle->destroy();
   delete culina_handle;
+
+  if (!passed) {
+    return 1;
+  }
+  return 0;
 }
 
 int main() {
+  std::printf("# GEMV test\n");
+  std::size_t num_tested = 0;
+  std::size_t num_failed = 0;
   std::printf("dtype,m,n,relative_error,check\n");
   for (const auto op_A : std::vector<culina::blas::op_t>{
            culina::blas::op_t::N, culina::blas::op_t::T}) {
-    eval<half, culina::default_mode>(1024, 512, op_A);
-    eval<float, culina::default_mode>(1024, 512, op_A);
-    eval<double, culina::default_mode>(1024, 512, op_A);
+    for (std::size_t N_base = 32; N_base <= 1024; N_base <<= 1) {
+      for (std::size_t N_offset = 0; N_offset < 3; N_offset++) {
+        const auto N = N_base + N_offset;
+        for (std::size_t M_base = 32; M_base <= 1024; M_base <<= 1) {
+          for (std::size_t M_offset = 0; M_offset < 3; M_offset++) {
+            const auto M = M_base + M_offset;
+            num_failed += eval<half, culina::default_mode>(M, N, op_A);
+            num_failed += eval<float, culina::default_mode>(M, N, op_A);
+            num_failed += eval<double, culina::default_mode>(M, N, op_A);
+            num_failed += eval<culina::numeric_format::interval<half>,
+                               culina::default_mode>(M, N, op_A);
+            num_failed += eval<culina::numeric_format::interval<float>,
+                               culina::default_mode>(M, N, op_A);
+            num_failed += eval<culina::numeric_format::interval<double>,
+                               culina::default_mode>(M, N, op_A);
+            num_tested += 6;
+          }
+        }
+      }
+    }
   }
+  std::printf("Test: %5lu / %5lu passed\n", (num_tested - num_failed),
+              num_tested);
 }
