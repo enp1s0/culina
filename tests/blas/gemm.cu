@@ -1,8 +1,8 @@
 #include "../utils.cuh"
 #include <chrono>
 #include <culina/culina.cuh>
+#include <omp.h>
 #include <random>
-#include <typeinfo>
 
 class culina_handle_t : public culina::handle_base {
 public:
@@ -20,8 +20,8 @@ public:
 };
 
 template <class T, class Mode>
-void eval(const std::size_t m, const std::size_t n, const std::size_t k,
-          const culina::blas::op_t op_A, const culina::blas::op_t op_B) {
+int eval(const std::size_t m, const std::size_t n, const std::size_t k,
+         const culina::blas::op_t op_A, const culina::blas::op_t op_B) {
   const auto lda = op_A == culina::blas::op_t::N ? m + 20 : k + 31;
   const auto ldb = op_B == culina::blas::op_t::N ? k + 11 : n + 29;
   const auto ldc = m + 10;
@@ -35,15 +35,21 @@ void eval(const std::size_t m, const std::size_t n, const std::size_t k,
   auto mat_D = culina_test::get_managed_unique_ptr<T>(num_mat_C_elms);
 
   std::uniform_real_distribution<double> dist(-1, 1);
-  std::mt19937 mt(0);
-  for (std::size_t i = 0; i < num_mat_A_elms; i++) {
-    mat_A.get()[i] = static_cast<T>(dist(mt));
-  }
-  for (std::size_t i = 0; i < num_mat_B_elms; i++) {
-    mat_B.get()[i] = static_cast<T>(dist(mt));
-  }
-  for (std::size_t i = 0; i < num_mat_C_elms; i++) {
-    mat_C.get()[i] = static_cast<T>(dist(mt));
+#pragma omp parallel
+  {
+    std::mt19937 mt(omp_get_thread_num());
+    for (std::size_t i = omp_get_thread_num(); i < num_mat_A_elms;
+         i += omp_get_num_threads()) {
+      mat_A.get()[i] = static_cast<T>(dist(mt));
+    }
+    for (std::size_t i = omp_get_thread_num(); i < num_mat_B_elms;
+         i += omp_get_num_threads()) {
+      mat_B.get()[i] = static_cast<T>(dist(mt));
+    }
+    for (std::size_t i = omp_get_thread_num(); i < num_mat_C_elms;
+         i += omp_get_num_threads()) {
+      mat_C.get()[i] = static_cast<T>(dist(mt));
+    }
   }
 
   const T alpha = 1, beta = -1;
@@ -103,38 +109,73 @@ void eval(const std::size_t m, const std::size_t n, const std::size_t k,
   const auto error = std::sqrt(diff_norm2 / base_norm2);
   const auto error_threshold =
       culina_test::get_error_threshold<T>() * std::sqrt(static_cast<double>(k));
-  std::printf(
-      "%s,%s,%s,%s,%lu,%lu,%lu,%e,%e,%s\n",
-      culina_test::get_str<Mode>().c_str(), culina_test::get_str<T>().c_str(),
-      culina::blas::to_str(op_A).c_str(), culina::blas::to_str(op_B).c_str(), m,
-      n, k, throughput, error, (error < error_threshold ? "OK" : "NG"));
+  const auto passed = error < error_threshold;
+  if (!passed) {
+    std::printf(
+        "%s,%s,%s,%s,%lu,%lu,%lu,%e,%e,%s\n",
+        culina_test::get_str<Mode>().c_str(), culina_test::get_str<T>().c_str(),
+        culina::blas::to_str(op_A).c_str(), culina::blas::to_str(op_B).c_str(),
+        m, n, k, throughput, error, (error ? "OK" : "NG"));
+  }
   std::fflush(stdout);
 
   culina_handle->destroy();
   delete culina_handle;
+
+  if (!passed) {
+    return 1;
+  }
+  return 0;
 }
 
 int main() {
+  std::printf("# GEMM test\n");
+  std::size_t num_tested = 0;
+  std::size_t num_failed = 0;
   std::printf("mode,dtype,m,n,k,gflops,relative_error,check\n");
   for (const auto op_A : std::vector<culina::blas::op_t>{
            culina::blas::op_t::N, culina::blas::op_t::T}) {
     for (const auto op_B : std::vector<culina::blas::op_t>{
              culina::blas::op_t::N, culina::blas::op_t::T}) {
-      constexpr std::uint16_t m = 1024;
-      constexpr std::uint16_t n = 512;
-      constexpr std::uint16_t k = 256;
-      eval<half, culina::default_mode>(m, n, k, op_A, op_B);
-      eval<float, culina::default_mode>(m, n, k, op_A, op_B);
-      eval<double, culina::default_mode>(m, n, k, op_A, op_B);
-      eval<half, culina::generic_kernel_mode>(m, n, k, op_A, op_B);
-      eval<float, culina::generic_kernel_mode>(m, n, k, op_A, op_B);
-      eval<double, culina::generic_kernel_mode>(m, n, k, op_A, op_B);
-      eval<culina::numeric_format::interval<half>, culina::generic_kernel_mode>(
-          m, n, k, op_A, op_B);
-      eval<culina::numeric_format::interval<float>,
-           culina::generic_kernel_mode>(m, n, k, op_A, op_B);
-      eval<culina::numeric_format::interval<double>,
-           culina::generic_kernel_mode>(m, n, k, op_A, op_B);
+      for (std::size_t N_base = 64; N_base <= 1024; N_base <<= 2) {
+        for (std::size_t N_offset = 0; N_offset < 2; N_offset++) {
+          const auto N = N_base + N_offset;
+          for (std::size_t M_base = 64; M_base <= 1024; M_base <<= 2) {
+            for (std::size_t M_offset = 0; M_offset < 2; M_offset++) {
+              const auto M = M_base + M_offset;
+              for (std::size_t K_base = 64; K_base <= 1024; K_base <<= 2) {
+                for (std::size_t K_offset = 0; K_offset < 2; K_offset++) {
+                  const auto K = K_base + K_offset;
+                  num_failed +=
+                      eval<half, culina::default_mode>(M, N, K, op_A, op_B);
+                  num_failed +=
+                      eval<float, culina::default_mode>(M, N, K, op_A, op_B);
+                  num_failed +=
+                      eval<double, culina::default_mode>(M, N, K, op_A, op_B);
+                  num_failed += eval<half, culina::generic_kernel_mode>(
+                      M, N, K, op_A, op_B);
+                  num_failed += eval<float, culina::generic_kernel_mode>(
+                      M, N, K, op_A, op_B);
+                  num_failed += eval<double, culina::generic_kernel_mode>(
+                      M, N, K, op_A, op_B);
+                  num_failed +=
+                      eval<culina::numeric_format::interval<half>,
+                           culina::generic_kernel_mode>(M, N, K, op_A, op_B);
+                  num_failed +=
+                      eval<culina::numeric_format::interval<float>,
+                           culina::generic_kernel_mode>(M, N, K, op_A, op_B);
+                  num_failed +=
+                      eval<culina::numeric_format::interval<double>,
+                           culina::generic_kernel_mode>(M, N, K, op_A, op_B);
+                  num_tested += 9;
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
+  std::printf("Test: %5lu / %5lu passed\n", (num_tested - num_failed),
+              num_tested);
 }
